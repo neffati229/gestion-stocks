@@ -110,3 +110,4 @@ gestion-stocks/
 - Guards de routes par rôle
 - Audit log toutes les actions
 
+# Trigger pipeline
