@@ -111,3 +111,4 @@ gestion-stocks/
 - Audit log toutes les actions
 
 # Trigger pipeline
+# fix permissions
