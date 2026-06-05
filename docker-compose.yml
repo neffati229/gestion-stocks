@@ -2,7 +2,6 @@ version: '3.8'
 
 services:
 
-  # ── MySQL Database ──────────────────────────────
   mysql:
     image: mysql:8.0.33
     container_name: gestion-stocks-db
@@ -12,6 +11,7 @@ services:
       MYSQL_DATABASE: gestion_stocks
       MYSQL_USER: stocks_user
       MYSQL_PASSWORD: stocks1234
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --skip-character-set-client-handshake
     ports:
       - "3307:3306"
     volumes:
@@ -25,7 +25,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Backend Spring Boot ─────────────────────────
   backend:
     build:
       context: ./backend
@@ -33,7 +32,7 @@ services:
     container_name: gestion-stocks-backend
     restart: unless-stopped
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/gestion_stocks?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/gestion_stocks?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&useUnicode=true&connectionCollation=utf8mb4_unicode_ci
       SPRING_DATASOURCE_USERNAME: stocks_user
       SPRING_DATASOURCE_PASSWORD: stocks1234
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
@@ -48,7 +47,6 @@ services:
     networks:
       - gestion-network
 
-  # ── Frontend Angular ────────────────────────────
   frontend:
     build:
       context: ./frontend

@@ -55,4 +55,16 @@ export class RapportService {
   getCommandesProposees(magasinId: number): Observable<CommandeProposee[]> {
     return this.http.get<CommandeProposee[]>(`${this.url}/commandes-proposees`, { params: { magasinId } });
   }
+
+  getMouvements(magasinId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${environment.apiUrl}/stocks/mouvements`, { params: { magasinId, page: 0, size: 200 } });
+  }
+
+  getStocks(magasinId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${environment.apiUrl}/stocks`, { params: { magasinId } });
+  }
+
+  getProduits(): Observable<any[]> {
+    return this.http.get<any[]>(`${environment.apiUrl}/produits`);
+  }
 }

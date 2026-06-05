@@ -485,6 +485,14 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   stats = signal<DashboardStats | null>(null);
   commandes = signal<CommandeProposee[]>([]);
   loading = signal(true);
+  chartMonths: string[] = ['Déc', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai'];
+  chartEntrees: number[] = [120, 190, 150, 220, 180, 260];
+  chartSorties: number[] = [90, 140, 110, 170, 130, 200];
+  chartCatLabels: string[] = ['Alim.', 'Élec.', 'Text.', 'Autre'];
+  chartCatValues: number[] = [48000, 72000, 31000, 15000];
+  chartDonutLabels: string[] = ['Alimentaire', 'Électronique', 'Textile', 'Autre'];
+  chartDonutValues: number[] = [35, 28, 22, 15];
+  stockAlerts: Array<{nom: string; quantite: number; seuilMin: number}> = [];
   today = new Date();
   commandesCols = ['code', 'nom', 'quantiteActuelle', 'quantiteACommander', 'totalCommande', 'fournisseurNom'];
 
@@ -506,7 +514,6 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         this.stats.set(s);
         this.loading.set(false);
         this.buildNotifications(s);
-        setTimeout(() => this.drawCharts(), 100);
       },
       error: () => {
         this.loading.set(false);
@@ -516,6 +523,30 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     });
     this.rapportService.getCommandesProposees(magasinId).subscribe({
       next: c => this.commandes.set(c)
+    });
+    // Load real mouvements data for line chart
+    this.rapportService.getMouvements(magasinId).subscribe({
+      next: (data: any[]) => {
+        this.buildChartsFromData(data);
+        setTimeout(() => this.drawCharts(), 100);
+      },
+      error: () => {
+        setTimeout(() => this.drawCharts(), 100);
+      }
+    });
+    // Load stocks for donut + alerts
+    this.rapportService.getStocks(magasinId).subscribe({
+      next: (stocks: any[]) => {
+        this.buildStockCharts(stocks);
+        setTimeout(() => this.drawDoughnutChart(), 200);
+      }
+    });
+    // Load produits for bar chart by category
+    this.rapportService.getProduits().subscribe({
+      next: (produits: any[]) => {
+        this.buildCategoryChart(produits);
+        setTimeout(() => this.drawBarChart(), 200);
+      }
     });
   }
 
@@ -554,6 +585,87 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     });
   }
 
+  buildChartsFromData(mouvements: any[]): void {
+    const now = new Date();
+    const monthLabels: string[] = [];
+    const entrees: number[] = [];
+    const sorties: number[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthLabels.push(d.toLocaleString('fr-FR', { month: 'short' }));
+      const m = d.getMonth();
+      const y = d.getFullYear();
+
+      const e = mouvements
+        .filter((mv: any) => {
+          const dd = new Date(mv.createdAt);
+          return dd.getMonth() === m && dd.getFullYear() === y && mv.typeMvt === 'ENTREE';
+        })
+        .reduce((sum: number, mv: any) => sum + (mv.quantite || 0), 0);
+
+      const s = mouvements
+        .filter((mv: any) => {
+          const dd = new Date(mv.createdAt);
+          return dd.getMonth() === m && dd.getFullYear() === y && mv.typeMvt === 'SORTIE';
+        })
+        .reduce((sum: number, mv: any) => sum + (mv.quantite || 0), 0);
+
+      entrees.push(Math.round(e));
+      sorties.push(Math.round(s));
+    }
+
+    this.chartMonths = monthLabels;
+    this.chartEntrees = entrees;
+    this.chartSorties = sorties;
+  }
+
+  buildStockCharts(stocks: any[]): void {
+    // Build donut from real stock quantities
+    const total = stocks.reduce((s: number, st: any) => s + (st.quantite || 0), 0);
+    if (total === 0) return;
+    // Group by produit category (use produitNom as proxy)
+    const groups: {[key: string]: number} = {};
+    stocks.forEach((st: any) => {
+      const key = st.produitNom || 'Autre';
+      groups[key] = (groups[key] || 0) + (st.quantite || 0);
+    });
+    const labels = Object.keys(groups).map(k => k.length > 10 ? k.substring(0, 8) + '.' : k);
+    const values = Object.values(groups).map((v: any) => Math.round((v / total) * 100));
+    if (labels.length > 0) {
+      this.chartDonutLabels = labels;
+      this.chartDonutValues = values;
+    }
+    // Build alerts list
+    this.stockAlerts = stocks
+      .filter((st: any) => st.sousSeuilMin)
+      .map((st: any) => ({ nom: st.produitNom, quantite: st.quantite, seuilMin: st.seuilMin }));
+    // Update notifications with real alerts
+    if (this.stockAlerts.length > 0) {
+      const alertNotif = {
+        id: 1, type: 'danger', icon: 'warning',
+        title: 'Alerte Stock Critique',
+        message: `${this.stockAlerts.length} produit(s) sous seuil : ${this.stockAlerts.map(a => a.nom).join(', ')}`,
+        time: new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})
+      };
+      this.notifications = [alertNotif, ...this.notifications.filter(n => n.id !== 1)];
+    }
+  }
+
+  buildCategoryChart(produits: any[]): void {
+    // Group products by category and sum prixVente * stock
+    const catMap: {[key: string]: number} = {};
+    produits.forEach((p: any) => {
+      const cat = p.categorieNom || 'Autre';
+      const shortCat = cat.substring(0, 5) + '.';
+      catMap[shortCat] = (catMap[shortCat] || 0) + (p.prixVente || 0);
+    });
+    if (Object.keys(catMap).length > 0) {
+      this.chartCatLabels = Object.keys(catMap);
+      this.chartCatValues = Object.values(catMap);
+    }
+  }
+
   drawCharts(): void {
     this.drawLineChart();
     this.drawBarChart();
@@ -566,9 +678,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const months = ['Déc', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai'];
-    const entrees = [120, 190, 150, 220, 180, 260];
-    const sorties = [90, 140, 110, 170, 130, 200];
+    const months = this.chartMonths;
+    const entrees = this.chartEntrees;
+    const sorties = this.chartSorties;
 
     canvas.width = canvas.offsetWidth || 600;
     canvas.height = 200;
@@ -653,8 +765,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const categories = ['Alim.', 'Élec.', 'Text.', 'Autre'];
-    const values = [48000, 72000, 31000, 15000];
+    const categories = this.chartCatLabels;
+    const values = this.chartCatValues;
     const colors = ['#2E75B6', '#2e7d32', '#e65100', '#7b1fa2'];
 
     canvas.width = canvas.offsetWidth || 300;
@@ -715,8 +827,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const data = [35, 28, 22, 15];
-    const labels = ['Alimentaire', 'Électronique', 'Textile', 'Autre'];
+    const data = this.chartDonutValues;
+    const labels = this.chartDonutLabels;
     const colors = ['#2E75B6', '#2e7d32', '#e65100', '#7b1fa2'];
     const total = data.reduce((a, b) => a + b, 0);
 
