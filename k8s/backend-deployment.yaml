@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: gestion-stocks-backend:latest
+          image: ghcr.io/neffati229/gestion-stocks/backend:latest
           ports:
             - containerPort: 8081
           env:

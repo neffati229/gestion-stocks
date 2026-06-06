@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: gestion-stocks-frontend:latest
+          image: ghcr.io/neffati229/gestion-stocks/frontend:latest
           ports:
             - containerPort: 80
           resources:
