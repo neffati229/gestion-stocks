@@ -145,7 +145,7 @@ jobs:
   # ─────────────────────────────────────────
   deploy:
     name: 🚀 Deploy on Kubernetes
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: build-push
     if: github.ref == 'refs/heads/main'
     steps:
