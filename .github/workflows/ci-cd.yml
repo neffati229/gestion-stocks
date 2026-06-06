@@ -169,8 +169,8 @@ jobs:
 
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/backend -n gestion-stocks --timeout=120s
-          kubectl rollout status deployment/frontend -n gestion-stocks --timeout=120s
+          kubectl rollout status deployment/backend -n gestion-stocks --timeout=300s
+          kubectl rollout status deployment/frontend -n gestion-stocks --timeout=300s
 
       - name: Verify deployment
         run: |
